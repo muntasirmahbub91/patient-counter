@@ -56,30 +56,30 @@ function loadSessions(): Session[] {
 function saveSessions(list: Session[]) {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(list));
 }
-
-function loadLocations(): string[] {
+function loadLocations(): (string | null)[] {
   try {
     const raw = localStorage.getItem(LOCATIONS_KEY);
-    const arr = raw ? (JSON.parse(raw) as string[]) : DEFAULT_LOCATIONS;
+    const arr = raw ? (JSON.parse(raw) as (string | null)[]) : DEFAULT_LOCATIONS;
     const fixed = [...arr];
-    for (let i = fixed.length; i < 5; i++)
+    for (let i = fixed.length; i < 5; i++) {
       fixed.push(`Clinic ${String.fromCharCode(65 + i)}`);
+    }
     return fixed.slice(0, 5);
   } catch {
     return DEFAULT_LOCATIONS;
   }
 }
-function saveLocations(names: string[]) {
+function saveLocations(names: (string | null)[]) {
   localStorage.setItem(LOCATIONS_KEY, JSON.stringify(names.slice(0, 5)));
 }
 
-/* -------------------- Current transient state -------------------- */
+/* -------------------- Current state -------------------- */
 type CurrentState = {
   date: string | null;
   location: string | null;
   newCount: number;
   oldCount: number;
-  locked: boolean; // becomes true on first increment
+  locked: boolean;
 };
 const loadCurrent = (): CurrentState => {
   try {
@@ -106,7 +106,7 @@ const loadCurrent = (): CurrentState => {
 const saveCurrent = (s: CurrentState) =>
   localStorage.setItem(CURRENT_KEY, JSON.stringify(s));
 
-/* -------------------- Haptic shim -------------------- */
+/* -------------------- Haptics -------------------- */
 const haptic = () => {
   if (navigator.vibrate) navigator.vibrate(10);
 };
@@ -114,7 +114,7 @@ const haptic = () => {
 /* -------------------- App -------------------- */
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>(loadSessions());
-  const [locations, setLocations] = useState<string[]>(loadLocations());
+  const [locations, setLocations] = useState<(string | null)[]>(loadLocations());
   const [current, setCurrent] = useState<CurrentState>(loadCurrent());
 
   const [showHistory, setShowHistory] = useState(false);
@@ -169,7 +169,6 @@ export default function App() {
     setCurrent((s) => ({ ...s, location: val }));
   };
 
-  /* -------------------- Finish (merge) -------------------- */
   const doFinish = () => {
     if (total === 0 || !current.date || !current.location) {
       setShowFinish(false);
@@ -177,7 +176,7 @@ export default function App() {
     }
     setSessions((prev) => {
       const idx = prev.findIndex(
-        (r) => r.date === current.date! && r.location === current.location!
+        (r) => r.date === current.date && r.location === current.location
       );
       const ts = localISO();
       if (idx >= 0) {
@@ -195,8 +194,8 @@ export default function App() {
       }
       const next: Session = {
         sessionId: uuidv4(),
-        date: current.date!, // safe after guard
-        location: current.location!, // safe after guard
+        date: current.date,
+        location: current.location,
         total,
         finishedAt: ts,
       };
@@ -206,8 +205,6 @@ export default function App() {
           : b.date.localeCompare(a.date)
       );
     });
-
-    // Reset counts, keep same date/location, unlock
     setCurrent((s) => ({ ...s, newCount: 0, oldCount: 0, locked: false }));
     setShowFinish(false);
   };
@@ -220,15 +217,14 @@ export default function App() {
     return Array.from(set).sort().reverse();
   }, [sessions]);
   const [yearFilter, setYearFilter] = useState<string | "ALL">("ALL");
-  const [monthFilter, setMonthFilter] = useState<number | 0>(0); // 0 = ALL
+  const [monthFilter, setMonthFilter] = useState<number | 0>(0);
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
 
   const filtered = useMemo(() => {
     return sessions.filter((s) => {
       if (locFilter !== "ALL" && s.location !== locFilter) return false;
-      if (yearFilter !== "ALL" && s.date.slice(0, 4) !== yearFilter)
-        return false;
+      if (yearFilter !== "ALL" && s.date.slice(0, 4) !== yearFilter) return false;
       if (monthFilter !== 0 && Number(s.date.slice(5, 7)) !== monthFilter)
         return false;
       if (from && s.date < from) return false;
@@ -276,8 +272,11 @@ export default function App() {
 
   /* -------------------- UI -------------------- */
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex items-start justify-center p-4 sm:p-6">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-5 sm:p-6">
+    <div className="min-h-[100svh] w-full bg-gray-50 flex justify-center p-4 sm:p-6">
+      <div
+        className="w-full max-w-md bg-white rounded-3xl shadow-xl p-5 sm:p-6 flex flex-col"
+        style={{ minHeight: "calc(100svh - 2rem)" }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="w-6" />
@@ -297,7 +296,6 @@ export default function App() {
         <div className="rounded-2xl border border-gray-200 p-3 sm:p-4 mb-4">
           <h2 className="text-gray-500 font-semibold mb-2">Filters</h2>
           <div className="divide-y divide-gray-200">
-            {/* Date */}
             <label className="flex items-center gap-3 py-2">
               <Calendar className="h-5 w-5 text-gray-700" />
               <div className="flex-1">
@@ -311,7 +309,7 @@ export default function App() {
                 disabled={current.locked}
               />
             </label>
-            {/* Location */}
+
             <label className="flex items-center gap-3 py-2">
               <MapPin className="h-5 w-5 text-gray-700" />
               <div className="flex-1">
@@ -327,7 +325,7 @@ export default function App() {
                   Select
                 </option>
                 {locations.slice(0, 5).map((name, i) => (
-                  <option key={i} value={name}>
+                  <option key={i} value={name ?? ""}>
                     {name}
                   </option>
                 ))}
@@ -347,7 +345,6 @@ export default function App() {
         {/* Counters Card */}
         <div className="rounded-2xl border border-gray-200 p-3 sm:p-4 mb-4">
           <div className="grid grid-cols-2 gap-3">
-            {/* NEW */}
             <div className="relative rounded-2xl border border-gray-200 p-3 text-center">
               <button
                 className="mx-auto mb-1 p-2 rounded-lg hover:bg-blue-50 disabled:opacity-50"
@@ -366,9 +363,7 @@ export default function App() {
               >
                 <ChevronDown className="h-6 w-6" />
               </button>
-              <div className="mt-1 text-sm font-semibold text-blue-700">
-                NEW
-              </div>
+              <div className="mt-1 text-sm font-semibold text-blue-700">NEW</div>
               <button
                 className="absolute top-2 right-2 p-2 rounded-lg hover:bg-gray-100"
                 onClick={() => onReset("newCount")}
@@ -379,7 +374,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* OLD */}
             <div className="relative rounded-2xl border border-gray-200 p-3 text-center">
               <button
                 className="mx-auto mb-1 p-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
@@ -398,9 +392,7 @@ export default function App() {
               >
                 <ChevronDown className="h-6 w-6" />
               </button>
-              <div className="mt-1 text-sm font-semibold text-gray-700">
-                OLD
-              </div>
+              <div className="mt-1 text-sm font-semibold text-gray-700">OLD</div>
               <button
                 className="absolute top-2 right-2 p-2 rounded-lg hover:bg-gray-100"
                 onClick={() => onReset("oldCount")}
@@ -412,14 +404,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* Total */}
           <div className="mt-4 pt-3 border-t text-center text-lg font-semibold text-gray-800">
             Total: <span className="tabular-nums">{pad2(total)}</span>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 items-center">
+        <div className="mt-auto flex gap-3 items-center">
           <button
             className="flex-1 inline-flex items-center justify-center gap-2 border border-gray-300 text-gray-900 rounded-xl py-3 hover:bg-gray-50"
             onClick={() => setShowHistory(true)}
@@ -434,6 +425,7 @@ export default function App() {
             <CheckCircle2 className="h-5 w-5" /> Finish
           </button>
         </div>
+
         <p className="text-center text-sm text-gray-500 mt-3">
           Finish closes today’s session and saves to History.
         </p>
@@ -477,7 +469,7 @@ export default function App() {
                     <span className="w-8 text-sm text-gray-500">{i + 1}.</span>
                     <input
                       className="flex-1 border rounded-lg px-3 py-2 text-sm"
-                      value={n}
+                      value={n ?? ""}
                       onChange={(e) => {
                         const copy = [...locations];
                         copy[i] =
@@ -516,7 +508,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Filters */}
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <select
                   className="border rounded-lg px-3 py-2 text-sm"
@@ -525,7 +516,7 @@ export default function App() {
                 >
                   <option value="ALL">All locations</option>
                   {locations.map((n, i) => (
-                    <option key={i} value={n}>
+                    <option key={i} value={n ?? ""}>
                       {n}
                     </option>
                   ))}
@@ -571,7 +562,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Export shortcuts */}
               <div className="flex gap-2 mb-3">
                 <button
                   className="flex-1 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
@@ -587,7 +577,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* List */}
               <div className="max-h-[60vh] overflow-y-auto rounded-2xl border border-gray-200">
                 {filtered.length === 0 ? (
                   <div className="p-4 text-sm text-gray-600">No entries.</div>
