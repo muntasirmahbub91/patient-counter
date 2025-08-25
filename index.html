@@ -4,22 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patient Counter</title>
 
-    <!-- Theme color for Android/iOS status bar -->
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Theme color for iOS/Android status bar -->
     <meta name="theme-color" content="#ffffff" />
 
-    <!-- iOS PWA full screen -->
+    <!-- iOS full screen & status bar control -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Patient Counter" />
-
-    <!-- Manifest for PWA -->
-    <link rel="manifest" href="/manifest.json" />
-
-    <title>Patient Counter</title>
-    <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body>
+  <body class="bg-gray-50">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
