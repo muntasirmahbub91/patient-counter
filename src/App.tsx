@@ -87,7 +87,7 @@ const haptic = () => {
 // -------------------- App --------------------
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>(loadSessions());
-  const [locations, setLocations] = useState<string[]>(loadLocations());
+  const [locations, setLocations] = useState<(string | null)[]>(loadLocations());
   const [current, setCurrent] = useState<CurrentState>(loadCurrent());
 
   const [showHistory, setShowHistory] = useState(false);
